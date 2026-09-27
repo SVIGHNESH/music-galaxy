@@ -6,10 +6,14 @@ import { ACESFilmicToneMapping, PerspectiveCamera, RenderPipeline, Scene, WebGPU
 import { pass } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { AudioAnalysis } from './audio/analysis';
+import { AudioEngine } from './audio/AudioEngine';
 import { FixedClock } from './core/clock';
 import { pickStarCount, QualityGovernor } from './core/tier';
 import { Galaxy } from './galaxy/Galaxy';
+import { DebugMeter } from './ui/debugMeter';
 import { Hud } from './ui/hud';
+import { SourcePicker } from './ui/sourcePicker';
 
 async function start() {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene')!;
@@ -76,9 +80,22 @@ async function start() {
     renderer.setSize(innerWidth, innerHeight);
   });
 
-  // Test impulse until audio drives the sim: space, or a click/tap that isn't a drag.
+  const audio = new AudioEngine();
+  new SourcePicker(document.querySelector('#controls')!, audio);
+  const meter = new DebugMeter(document.body);
+  // Created once the AudioContext exists, since band edges depend on its sample rate.
+  let analysis: AudioAnalysis | null = null;
+  audio.onChange(() => {
+    analysis ??= audio.analyser ? new AudioAnalysis(audio.fftSize, audio.sampleRate) : null;
+  });
+
+  // Space plays/pauses a file; otherwise it (and a click/tap) sends a test pulse.
   addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && !e.repeat) galaxy.pulse();
+    if (e.code !== 'Space' || e.repeat) return;
+    if (e.target instanceof HTMLButtonElement || e.target instanceof HTMLSelectElement) return;
+    e.preventDefault();
+    if (audio.media) audio.togglePlayback();
+    else galaxy.pulse();
   });
   let down: { x: number; y: number; t: number } | null = null;
   canvas.addEventListener('pointerdown', (e) => (down = { x: e.clientX, y: e.clientY, t: performance.now() }));
@@ -91,7 +108,15 @@ async function start() {
 
   const clock = new FixedClock();
   renderer.setAnimationLoop(() => {
-    clock.tick((t) => galaxy.simulate(renderer, t, clock.step));
+    clock.tick((t) => {
+      if (analysis) {
+        const f = analysis.step(audio.analyser, clock.step);
+        meter.step(f, t);
+        // Placeholder mapping to prove the chain end to end; milestone 4 replaces it.
+        if (f.beat) galaxy.pulse(8 + 16 * f.beatStrength);
+      }
+      galaxy.simulate(renderer, t, clock.step);
+    });
     controls.update();
     pipeline.render();
     hud.frame();

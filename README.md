@@ -17,12 +17,32 @@ pnpm install
 pnpm dev
 ```
 
-URL flags for testing:
+## Sound sources
+
+Use **+ Add sound** in the top-left corner:
+
+- **Play a file**, or drop an audio file anywhere on the page.
+- **Microphone or device** listens to the room, or to any input you pick.
+On Linux, choose a *Monitor of …* device (PipeWire/PulseAudio) to react to whatever any app is playing.
+- **Share a tab** (desktop Chrome/Edge) reacts to music playing in another tab.
+Tick "Share tab audio" in the browser dialog.
+
+Space plays or pauses a file.
+Press `D` to show the analysis meter (bass, mid, treble, level, beats).
+
+Each band has automatic gain, so a quiet microphone and a loud file drive the visuals equally.
+Beats are detected from low-frequency spectral flux against an adaptive threshold.
+
+## Testing flags
+
+URL flags:
 
 - `?renderer=webgl` forces the WebGL 2 fallback on a WebGPU-capable browser.
 - `?stars=N` fixes the star count and turns off adaptive quality.
 
-Click, tap or press Space to send a test shockwave through the disc.
+- `?debug` opens the analysis meter and keeps the stats visible on phones.
+
+Click or tap the galaxy to send a test shockwave through the disc.
 
 ## How it looks the same everywhere
 
@@ -43,7 +63,7 @@ pnpm preview
 
 1. Static galaxy with bloom and orbit camera (done)
 2. GPU compute simulation with adaptive star budget (done)
-3. Audio input: file, microphone or monitor device, tab or screen audio
+3. Audio input and analysis: file, microphone or monitor device, tab audio (done)
 4. Audio to visual mapping
 5. Polish: black hole, palettes, UI, PWA
 6. Deploy
