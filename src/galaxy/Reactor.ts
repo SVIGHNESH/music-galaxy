@@ -37,8 +37,7 @@ const BASE_BLOOM = 0.9;
 export class Reactor {
   private spin = 0;
   private spinRate = IDLE_SPIN;
-  /** Beat envelope, 0..1; also read by the black hole's photon ring. */
-  flash = 0;
+  private flash = 0;
   private punch = 0;
   private shake = 0;
   private presence = 0;

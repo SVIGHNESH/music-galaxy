@@ -10,7 +10,7 @@ const RADIUS = 1.05;
 const LENGTH = 1.7;
 
 /**
- * Circular spectrum around the black hole: 128 bars of light radiating
+ * Circular spectrum around the galactic core: 128 bars of light radiating
  * outward, each stretching with its frequency band. The ring always faces the
  * camera, so it reads as a halo from any orbit angle, and starts just outside
  * the bulge glow so the bars land on dark sky.

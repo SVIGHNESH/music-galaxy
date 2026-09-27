@@ -18,7 +18,7 @@ import { AudioAnalysis } from './audio/analysis';
 import { AudioEngine } from './audio/AudioEngine';
 import { FixedClock } from './core/clock';
 import { pickStarCount, QualityGovernor } from './core/tier';
-import { createBlackHole } from './galaxy/blackHole';
+import { finalPass } from './galaxy/finalPass';
 import { Galaxy } from './galaxy/Galaxy';
 import { Reactor, SILENT } from './galaxy/Reactor';
 import { SpectrumRing } from './galaxy/SpectrumRing';
@@ -70,18 +70,17 @@ async function start() {
   const ring = new SpectrumRing();
   scene.add(ring);
 
-  // Post chain: trails -> lens -> bloom -> one fused pass for lens, horizon
-  // shadow, drop flash and colour split (full-screen passes are the main cost
-  // on integrated GPUs, so they are kept to a minimum).
+  // Post chain: trails -> bloom -> one fused pass for bloom mix, drop flash
+  // and colour split.
   const fx = { trail: uniform(0), aberration: uniform(0), whiteout: uniform(0) };
   const pipeline = new RenderPipeline(renderer);
   const scenePass = pass(scene, camera);
   const trails = afterImage(scenePass.getTextureNode('output'), fx.trail);
-  const hole = createBlackHole(trails.getTextureNode());
-  const bloomPass = bloom(hole.lensed, 0.9, 0.55, 0.05);
+  const trailTexture = trails.getTextureNode();
+  const bloomPass = bloom(trailTexture, 0.9, 0.55, 0.05);
   // @types/three still calls this getTexture(); the runtime method is getTextureNode().
   const bloomTexture = (bloomPass as unknown as { getTextureNode(): TextureNode }).getTextureNode();
-  pipeline.outputNode = hole.finalize(bloomTexture, fx.aberration, fx.whiteout);
+  pipeline.outputNode = finalPass(trailTexture, bloomTexture, fx.aberration, fx.whiteout);
   const reactor = new Reactor(camera, FOV, { bloom: bloomPass, ...fx }, ring);
   if (new URLSearchParams(location.search).has('debug')) {
     Object.assign(window, { galaxyDebug: { ring, reactor, fx, camera, renderer, scene, get galaxy() { return galaxy; } } });
@@ -143,11 +142,9 @@ async function start() {
       reactor.step(f, galaxy, clock.step);
       galaxy.simulate(renderer, t, clock.step);
     });
-    hole.flare.value = reactor.flash;
     controls.update();
     reactor.applyShake(clock.simTime);
     ring.orient(camera);
-    hole.update(camera, camera.fov);
     pipeline.render();
     hud.frame();
     governor.frame();

@@ -42,7 +42,7 @@ Beats are detected from low-frequency spectral flux against an adaptive threshol
 | Mids | Rotation speeds up with momentum, and the arms swirl more |
 | Treble | About one star in five flares and flickers |
 | Level | Overall glow, and light trails in loud passages |
-| Spectrum | A ring of 128 bars around the black hole, lows at the top, highs at the bottom |
+| Spectrum | A ring of 128 bars around the core, lows at the top, highs at the bottom |
 | Drops | When the music slams back after a quieter stretch: a huge shockwave, white flash and camera shake |
 | Sound colour | Bassy, dark passages warm the galaxy; bright, airy ones cool it |
 
@@ -83,5 +83,5 @@ pnpm preview
 2. GPU compute simulation with adaptive star budget (done)
 3. Audio input and analysis: file, microphone or monitor device, tab audio (done)
 4. Audio to visual mapping (done)
-5. Polish: black hole, palettes, UI, PWA
+5. Polish: palettes, UI, PWA
 6. Deploy
