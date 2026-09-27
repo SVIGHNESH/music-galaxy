@@ -5,8 +5,8 @@
   --dust: #d0707a;
   --ink: rgba(226, 232, 255, 0.86);
   --ink-dim: rgba(169, 200, 255, 0.46);
-  --serif: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
-  --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --display: 'Syne', 'Arial Black', sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
   --edge: clamp(16px, 3.2vw, 40px);
   color-scheme: dark;
 }
@@ -56,17 +56,27 @@ html, body {
   bottom: max(var(--edge), env(safe-area-inset-bottom));
 }
 
+.hud-hint { display: flex; flex-wrap: wrap; column-gap: 0.7em; }
+.hud-hint span { white-space: nowrap; }
+.hud-hint i { font-style: normal; }
+
 .hud-title h1 {
-  font-family: var(--serif);
-  font-style: italic;
-  font-weight: 400;
-  font-size: clamp(2.6rem, 7vw, 5.2rem);
-  line-height: 0.9;
-  letter-spacing: -0.01em;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(2.5rem, 5.4vw, 4.4rem);
+  line-height: 0.92;
+  letter-spacing: -0.035em;
   color: #f4ecdf;
   text-shadow: 0 0 28px rgba(255, 184, 112, 0.28);
 }
 .hud-title h1 span { color: var(--core); }
+
+.hud-credit {
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  color: rgba(244, 236, 223, 0.7);
+}
 
 .hud-hint {
   margin-top: 0.9rem;
@@ -106,9 +116,15 @@ html, body {
 .fatal {
   position: absolute;
   inset: auto var(--edge) 50% var(--edge);
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 1.6rem;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1.3rem;
+  line-height: 1.5;
   text-align: center;
   color: var(--ink);
+}
+
+@media (max-width: 520px) {
+  .hud-hint { column-gap: 1.4em; row-gap: 0.3em; }
+  .hud-hint i { display: none; }
 }

@@ -8,7 +8,13 @@ export class Hud {
     root.innerHTML = `
       <header class="hud-title">
         <h1>Music <span>Galaxy</span></h1>
-        <p class="hud-hint">drag to orbit · ${matchMedia('(pointer: coarse)').matches ? 'pinch' : 'scroll'} to zoom</p>
+        <p class="hud-credit">by Vighnesh Shukla</p>
+        <p class="hud-hint">${(matchMedia('(pointer: coarse)').matches
+          ? ['drag to orbit', 'pinch to zoom', 'tap to pulse']
+          : ['drag to orbit', 'scroll to zoom', 'click to pulse']
+        )
+          .map((h) => `<span>${h}</span>`)
+          .join('<i aria-hidden="true">·</i>')}</p>
       </header>
       <dl class="hud-stats">
         <div><dt>renderer</dt><dd data-k="backend">-</dd></div>

@@ -1,5 +1,5 @@
-import '@fontsource/instrument-serif/400-italic.css';
-import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/syne/800.css';
+import '@fontsource/geist-mono/400.css';
 import './style.css';
 
 import { ACESFilmicToneMapping, PerspectiveCamera, RenderPipeline, Scene, WebGPURenderer } from 'three/webgpu';
@@ -7,6 +7,7 @@ import { pass } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FixedClock } from './core/clock';
+import { pickStarCount, QualityGovernor } from './core/tier';
 import { Galaxy } from './galaxy/Galaxy';
 import { Hud } from './ui/hud';
 
@@ -36,16 +37,26 @@ async function start() {
   controls.autoRotate = true;
   controls.autoRotateSpeed = 0.25;
 
-  const galaxy = new Galaxy();
+  const isWebGPU = (renderer.backend as { isWebGPUBackend?: boolean }).isWebGPUBackend === true;
+  let galaxy = new Galaxy({ count: pickStarCount(isWebGPU) });
   scene.add(galaxy);
+
+  // Rebuild at a smaller budget if this device can't hold the frame rate.
+  // Same seed and light compensation, so the galaxy looks the same, just sparser.
+  const governor = new QualityGovernor(isWebGPU, galaxy.params.count, (count) => {
+    scene.remove(galaxy);
+    galaxy.dispose();
+    galaxy = new Galaxy({ count });
+    scene.add(galaxy);
+    hud.setInfo({ backend: isWebGPU ? 'WebGPU' : 'WebGL 2', stars: count });
+  });
 
   const pipeline = new RenderPipeline(renderer);
   const scenePass = pass(scene, camera);
   const color = scenePass.getTextureNode('output');
   pipeline.outputNode = color.add(bloom(color, 0.9, 0.55, 0.05));
 
-  const backend = (renderer.backend as { isWebGPUBackend?: boolean }).isWebGPUBackend ? 'WebGPU' : 'WebGL 2';
-  hud.setInfo({ backend, stars: galaxy.params.count });
+  hud.setInfo({ backend: isWebGPU ? 'WebGPU' : 'WebGL 2', stars: galaxy.params.count });
 
   // Same composition on every screen: back the camera off until the disc fits
   // horizontally, so portrait phones see the whole galaxy instead of a crop.
@@ -65,13 +76,26 @@ async function start() {
     renderer.setSize(innerWidth, innerHeight);
   });
 
+  // Test impulse until audio drives the sim: space, or a click/tap that isn't a drag.
+  addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !e.repeat) galaxy.pulse();
+  });
+  let down: { x: number; y: number; t: number } | null = null;
+  canvas.addEventListener('pointerdown', (e) => (down = { x: e.clientX, y: e.clientY, t: performance.now() }));
+  canvas.addEventListener('pointerup', (e) => {
+    if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6 && performance.now() - down.t < 300) {
+      galaxy.pulse();
+    }
+    down = null;
+  });
+
   const clock = new FixedClock();
   renderer.setAnimationLoop(() => {
-    clock.tick();
-    galaxy.update(clock.simTime);
+    clock.tick((t) => galaxy.simulate(renderer, t, clock.step));
     controls.update();
     pipeline.render();
     hud.frame();
+    governor.frame();
   });
 
   hud.reveal();

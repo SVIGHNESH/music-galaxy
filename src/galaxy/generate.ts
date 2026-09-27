@@ -16,7 +16,7 @@ export interface GalaxyParams {
 
 export const defaultGalaxy: GalaxyParams = {
   seed: 1337,
-  count: 100_000,
+  count: 500_000,
   radius: 6,
   arms: 3,
   twist: 4.6,
