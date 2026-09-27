@@ -22,7 +22,8 @@ const BASE_BLOOM = 0.9;
 export class Reactor {
   private spin = 0;
   private spinRate = IDLE_SPIN;
-  private flash = 0;
+  /** Beat envelope, 0..1; also read by the black hole's photon ring. */
+  flash = 0;
   private punch = 0;
   private readonly motion = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0.3 : 1;
 

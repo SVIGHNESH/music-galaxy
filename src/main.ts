@@ -10,6 +10,7 @@ import { AudioAnalysis } from './audio/analysis';
 import { AudioEngine } from './audio/AudioEngine';
 import { FixedClock } from './core/clock';
 import { pickStarCount, QualityGovernor } from './core/tier';
+import { createBlackHole } from './galaxy/blackHole';
 import { Galaxy } from './galaxy/Galaxy';
 import { Reactor, SILENT } from './galaxy/Reactor';
 import { DebugMeter } from './ui/debugMeter';
@@ -59,9 +60,9 @@ async function start() {
 
   const pipeline = new RenderPipeline(renderer);
   const scenePass = pass(scene, camera);
-  const color = scenePass.getTextureNode('output');
-  const bloomPass = bloom(color, 0.9, 0.55, 0.05);
-  pipeline.outputNode = color.add(bloomPass);
+  const hole = createBlackHole(scenePass.getTextureNode('output'));
+  const bloomPass = bloom(hole.lensed, 0.9, 0.55, 0.05);
+  pipeline.outputNode = hole.composite(hole.lensed.add(bloomPass));
   const reactor = new Reactor(camera, FOV, bloomPass);
 
   hud.setInfo({ backend: isWebGPU ? 'WebGPU' : 'WebGL 2', stars: galaxy.params.count });
@@ -118,7 +119,9 @@ async function start() {
       reactor.step(f, galaxy, clock.step);
       galaxy.simulate(renderer, t, clock.step);
     });
+    hole.flare.value = reactor.flash;
     controls.update();
+    hole.update(camera, camera.fov);
     pipeline.render();
     hud.frame();
     governor.frame();
