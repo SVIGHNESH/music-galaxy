@@ -28,6 +28,7 @@ On Linux, choose a *Monitor of …* device (PipeWire/PulseAudio) to react to wha
 Tick "Share tab audio" in the browser dialog.
 
 Space plays or pauses a file.
+`P` cycles colour palettes (Ember, Glacier, Solar, Aurora, Mono) and `F` toggles fullscreen; both also have buttons in the bottom-right corner.
 Press `D` to show the analysis meter (bass, mid, treble, level, beats).
 
 Each band has automatic gain, so a quiet microphone and a loud file drive the visuals equally.

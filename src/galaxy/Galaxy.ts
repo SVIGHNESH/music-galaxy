@@ -8,6 +8,7 @@ import {
   instanceIndex,
   instancedArray,
   mix,
+  select,
   smoothstep,
   step,
   sin,
@@ -17,6 +18,7 @@ import {
 } from 'three/tsl';
 import { REFERENCE_STARS } from '../core/tier';
 import { defaultGalaxy, generateGalaxy, generateStarfield, type GalaxyParams } from './generate';
+import type { Palette } from './palette';
 
 /** Soft gaussian disc so each sprite reads as a point of light, not a square. */
 const glow = (sharpness: number) => {
@@ -60,7 +62,10 @@ export class Galaxy extends Group {
   private shockStart = -1e3;
   private readonly step;
 
-  constructor(params: Partial<GalaxyParams> = {}) {
+  constructor(
+    private readonly palette: Palette,
+    params: Partial<GalaxyParams> = {},
+  ) {
     super();
     this.params = { ...defaultGalaxy, ...params };
     const disc = this.buildDisc();
@@ -79,7 +84,21 @@ export class Galaxy extends Group {
     const home = instancedArray(data.positions, 'vec3');
     const position = instancedArray(data.positions.slice(), 'vec3');
     const velocity = instancedArray(p.count, 'vec3');
-    const color = instancedArray(data.colors, 'vec3').toAttribute();
+    // Colour comes from the live palette per star population, so palette
+    // switches crossfade on the GPU without regenerating anything.
+    const tone = instancedArray(data.tones, 'vec4').toAttribute();
+    const pc = this.palette.colors;
+    const kind = tone.x;
+    const ramp = tone.y;
+    const color = select(
+      kind.lessThan(0.5),
+      mix(pc.core, pc.inner, ramp).mul(0.75),
+      select(
+        kind.lessThan(1.5),
+        pc.halo.mul(0.5),
+        select(kind.lessThan(2.5), mix(pc.inner, pc.arm, ramp), pc.dust.mul(tone.z.mul(0.35).add(0.45))),
+      ),
+    );
     const size = instancedArray(data.sizes, 'float').toAttribute();
 
     const stepNode = Fn(() => {
@@ -155,7 +174,7 @@ export class Galaxy extends Group {
     // Stars knocked loose run hotter until they settle back into the arm.
     const speed = velocity.toAttribute().length();
     const heat = clamp(speed.mul(0.3), 0, 1);
-    const warm = vec3(1, 0.78, 0.52);
+    const warm = pc.core;
     // Beat flash radiates from the core, fading with each star's home radius.
     const coreFlash = flash.mul(exp(home.toAttribute().xz.length().mul(-0.7)));
     const tintColor = mix(vec3(1.22, 0.96, 0.78), vec3(0.8, 0.98, 1.25), tint.mul(0.5).add(0.5));

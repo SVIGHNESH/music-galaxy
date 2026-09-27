@@ -1,4 +1,3 @@
-import { Color } from 'three/webgpu';
 import { createRng } from '../core/rng';
 
 export interface GalaxyParams {
@@ -24,32 +23,35 @@ export const defaultGalaxy: GalaxyParams = {
   halo: 0.06,
 };
 
-export interface GalaxyData {
-  positions: Float32Array; // vec3
-  colors: Float32Array; // vec3, linear
-  sizes: Float32Array; // float
+/** Star populations; the shader colours each from the live palette. */
+export const enum StarKind {
+  Bulge = 0,
+  Halo = 1,
+  Arm = 2,
+  Dust = 3,
 }
 
-const palette = {
-  core: new Color('#ffb870'),
-  inner: new Color('#fff1dc'),
-  arm: new Color('#a9c8ff'),
-  dust: new Color('#d0707a'),
-  halo: new Color('#6f7fa8'),
-};
+export interface GalaxyData {
+  positions: Float32Array; // vec3
+  /** vec4 per star: [kind, t, rnd, 0]; t is the kind's colour-ramp position. */
+  tones: Float32Array;
+  sizes: Float32Array; // float
+}
 
 export function generateGalaxy(p: GalaxyParams): GalaxyData {
   const rng = createRng(p.seed);
   const positions = new Float32Array(p.count * 3);
-  const colors = new Float32Array(p.count * 3);
+  const tones = new Float32Array(p.count * 4);
   const sizes = new Float32Array(p.count);
-  const c = new Color();
 
   for (let i = 0; i < p.count; i++) {
-    const kind = rng.next();
+    const roll = rng.next();
     let x: number, y: number, z: number;
+    let kind: StarKind;
+    let t: number;
+    let rnd = 0;
 
-    if (kind < p.bulge) {
+    if (roll < p.bulge) {
       // Flattened gaussian bulge, hot and dense.
       const r = Math.abs(rng.gaussian()) * p.radius * 0.09;
       const theta = rng.range(0, Math.PI * 2);
@@ -57,12 +59,10 @@ export function generateGalaxy(p: GalaxyParams): GalaxyData {
       x = r * Math.sin(phi) * Math.cos(theta);
       y = r * Math.cos(phi) * 0.55;
       z = r * Math.sin(phi) * Math.sin(theta);
-      c.copy(palette.core).lerp(palette.inner, Math.min(r / (p.radius * 0.18), 1) * rng.next());
-      // Slightly dimmer than the arms: the bulge is so dense it would otherwise
-      // blow out to flat white and hide the spectrum ring around it.
-      c.multiplyScalar(0.75);
+      kind = StarKind.Bulge;
+      t = Math.min(r / (p.radius * 0.18), 1) * rng.next();
       sizes[i] = rng.range(0.6, 1.4);
-    } else if (kind < p.bulge + p.halo) {
+    } else if (roll < p.bulge + p.halo) {
       // Sparse spherical halo that gives the disc depth from oblique angles.
       const r = p.radius * Math.pow(rng.next(), 0.6) * 1.3;
       const theta = rng.range(0, Math.PI * 2);
@@ -70,37 +70,39 @@ export function generateGalaxy(p: GalaxyParams): GalaxyData {
       x = r * Math.sin(phi) * Math.cos(theta);
       y = r * Math.cos(phi) * 0.35;
       z = r * Math.sin(phi) * Math.sin(theta);
-      c.copy(palette.halo).multiplyScalar(0.5);
+      kind = StarKind.Halo;
+      t = 0;
       sizes[i] = rng.range(0.4, 0.9);
     } else {
       // Logarithmic-ish spiral arms with scatter that grows toward the rim.
-      const t = Math.pow(rng.next(), 1.35);
-      const r = p.radius * (0.08 + 0.92 * t);
+      const armT = Math.pow(rng.next(), 1.35);
+      const r = p.radius * (0.08 + 0.92 * armT);
       const arm = Math.floor(rng.next() * p.arms);
       // Most stars hug the arm ridge; a minority fills the inter-arm gaps.
       const inArm = rng.next() < 0.78;
-      const spread = inArm ? 0.07 + 0.1 * t : 0.5;
-      const angle = (arm / p.arms) * Math.PI * 2 + t * p.twist + rng.gaussian() * spread;
-      const jitter = 0.12 * (1 - 0.4 * t);
+      const spread = inArm ? 0.07 + 0.1 * armT : 0.5;
+      const angle = (arm / p.arms) * Math.PI * 2 + armT * p.twist + rng.gaussian() * spread;
+      const jitter = 0.12 * (1 - 0.4 * armT);
       x = Math.cos(angle) * r + rng.gaussian() * jitter;
       z = Math.sin(angle) * r + rng.gaussian() * jitter;
-      y = rng.gaussian() * 0.12 * (1 - 0.6 * t);
+      y = rng.gaussian() * 0.12 * (1 - 0.6 * armT);
 
-      const isDust = rng.next() < 0.14;
-      if (isDust) {
-        c.copy(palette.dust).multiplyScalar(rng.range(0.45, 0.8));
+      if (rng.next() < 0.14) {
+        kind = StarKind.Dust;
+        rnd = rng.next();
         sizes[i] = rng.range(1.2, 2.4);
       } else {
-        c.copy(palette.inner).lerp(palette.arm, Math.min(t * 1.6, 1));
+        kind = StarKind.Arm;
         sizes[i] = rng.range(0.5, 1.2);
       }
+      t = Math.min(armT * 1.6, 1);
     }
 
     positions.set([x, y, z], i * 3);
-    colors.set([c.r, c.g, c.b], i * 3);
+    tones.set([kind, t, rnd, 0], i * 4);
   }
 
-  return { positions, colors, sizes };
+  return { positions, tones, sizes };
 }
 
 /** Distant background stars on a large shell. */

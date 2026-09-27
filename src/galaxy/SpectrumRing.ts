@@ -1,7 +1,8 @@
-import { AdditiveBlending, Color, Sprite, SpriteNodeMaterial, Vector3, type Camera } from 'three/webgpu';
+import { AdditiveBlending, Sprite, SpriteNodeMaterial, Vector3, type Camera } from 'three/webgpu';
 import { cos, exp, float, instancedArray, mix, sin, uniform, uniformArray, uv, varying } from 'three/tsl';
 import { SPECTRUM_BANDS } from '../audio/analysis';
 import { createRng } from '../core/rng';
+import type { Palette } from './palette';
 
 const PER_BAR = 24;
 /** Mirrored left/right: lows meet at the top (over dark sky), highs at the bottom. */
@@ -19,12 +20,10 @@ export class SpectrumRing extends Sprite {
   readonly bands: number[] = new Array(SPECTRUM_BANDS).fill(0);
   /** Fades the whole ring in while sound is playing. */
   readonly presence = uniform(0);
-  readonly lowColor = uniform(new Color('#ffb870'));
-  readonly highColor = uniform(new Color('#a9c8ff'));
   private readonly screenRight = uniform(new Vector3(1, 0, 0));
   private readonly screenUp = uniform(new Vector3(0, 1, 0));
 
-  constructor() {
+  constructor(palette: Palette) {
     const material = new SpriteNodeMaterial({ transparent: true, depthWrite: false, blending: AdditiveBlending });
     super(material);
 
@@ -62,7 +61,7 @@ export class SpectrumRing extends Sprite {
     const bandFrac = varying(band.div(SPECTRUM_BANDS - 1));
     const ampV = varying(amp);
     const tip = varying(exp(along.sub(1).mul(4))); // brighter toward the bar's outer end
-    material.colorNode = mix(this.lowColor, this.highColor, bandFrac)
+    material.colorNode = mix(palette.colors.core, palette.colors.arm, bandFrac)
       .mul(ampV.mul(1.4).add(0.25))
       .mul(tip.mul(0.6).add(0.4))
       .mul(this.presence)

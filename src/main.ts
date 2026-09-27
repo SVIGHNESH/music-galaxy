@@ -20,11 +20,13 @@ import { FixedClock } from './core/clock';
 import { pickStarCount, QualityGovernor } from './core/tier';
 import { finalPass } from './galaxy/finalPass';
 import { Galaxy } from './galaxy/Galaxy';
+import { Palette } from './galaxy/palette';
 import { Reactor, SILENT } from './galaxy/Reactor';
 import { SpectrumRing } from './galaxy/SpectrumRing';
 import { DebugMeter } from './ui/debugMeter';
 import { Hud } from './ui/hud';
 import { SourcePicker } from './ui/sourcePicker';
+import { ViewControls } from './ui/viewControls';
 
 async function start() {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene')!;
@@ -54,7 +56,8 @@ async function start() {
   controls.autoRotateSpeed = 0.25;
 
   const isWebGPU = (renderer.backend as { isWebGPUBackend?: boolean }).isWebGPUBackend === true;
-  let galaxy = new Galaxy({ count: pickStarCount(isWebGPU) });
+  const palette = new Palette();
+  let galaxy = new Galaxy(palette, { count: pickStarCount(isWebGPU) });
   scene.add(galaxy);
 
   // Rebuild at a smaller budget if this device can't hold the frame rate.
@@ -62,12 +65,12 @@ async function start() {
   const governor = new QualityGovernor(isWebGPU, galaxy.params.count, (count) => {
     scene.remove(galaxy);
     galaxy.dispose();
-    galaxy = new Galaxy({ count });
+    galaxy = new Galaxy(palette, { count });
     scene.add(galaxy);
     hud.setInfo({ backend: isWebGPU ? 'WebGPU' : 'WebGL 2', stars: count });
   });
 
-  const ring = new SpectrumRing();
+  const ring = new SpectrumRing(palette);
   scene.add(ring);
 
   // Post chain: trails -> bloom -> one fused pass for bloom mix, drop flash
@@ -110,6 +113,7 @@ async function start() {
 
   const audio = new AudioEngine();
   new SourcePicker(document.querySelector('#controls')!, audio);
+  new ViewControls(document.querySelector('#view')!, palette);
   const meter = new DebugMeter(document.body);
   // Created once the AudioContext exists, since band edges depend on its sample rate.
   let analysis: AudioAnalysis | null = null;
@@ -140,6 +144,7 @@ async function start() {
       const f = analysis ? analysis.step(audio.analyser, clock.step) : SILENT;
       meter.step(f, t);
       reactor.step(f, galaxy, clock.step);
+      palette.step(clock.step);
       galaxy.simulate(renderer, t, clock.step);
     });
     controls.update();
