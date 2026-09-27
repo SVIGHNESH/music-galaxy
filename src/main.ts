@@ -158,6 +158,11 @@ async function start() {
   hud.reveal();
 }
 
+// Offline support and installability; dev builds skip it so HMR isn't cached.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  addEventListener('load', () => void navigator.serviceWorker.register('/sw.js'));
+}
+
 start().catch((err) => {
   console.error(err);
   document.querySelector('#hud')!.innerHTML =

@@ -52,6 +52,11 @@ Strong beats also split the colour channels for a moment.
 Silence settles everything back to the calm idle galaxy.
 With `prefers-reduced-motion`, the shockwave, swell and camera punch are scaled way down.
 
+## Install and offline
+
+Music Galaxy is a PWA: browsers offer to install it, and after one visit it works offline.
+The service worker is generated at build time with the exact files of that build, and each deploy replaces the previous cache.
+
 ## Testing flags
 
 URL flags:
@@ -84,5 +89,5 @@ pnpm preview
 2. GPU compute simulation with adaptive star budget (done)
 3. Audio input and analysis: file, microphone or monitor device, tab audio (done)
 4. Audio to visual mapping (done)
-5. Polish: palettes, UI, PWA
+5. Polish: palettes, UI, PWA (done)
 6. Deploy
