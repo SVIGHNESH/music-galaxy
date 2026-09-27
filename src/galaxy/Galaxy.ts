@@ -53,6 +53,8 @@ export class Galaxy extends Group {
     glow: uniform(0),
     /** Beat envelope: warm flash from the core. */
     flash: uniform(0),
+    /** Sound colour: -1 warms the galaxy (bassy, dark), +1 cools it (bright, airy). */
+    tint: uniform(0),
   };
 
   private shockStart = -1e3;
@@ -69,7 +71,7 @@ export class Galaxy extends Group {
   private buildDisc() {
     const p = this.params;
     const { time, dt, stiffness, damping, turbulence, shockAge, shockStrength } = this.sim;
-    const { spin, spinRate, breath, sparkle, glow: level, flash } = this.drive;
+    const { spin, spinRate, breath, sparkle, glow: level, flash, tint } = this.drive;
     const data = generateGalaxy(p);
 
     // `home` is each star's rest slot in the galaxy frame; the sim keeps
@@ -156,7 +158,9 @@ export class Galaxy extends Group {
     const warm = vec3(1, 0.78, 0.52);
     // Beat flash radiates from the core, fading with each star's home radius.
     const coreFlash = flash.mul(exp(home.toAttribute().xz.length().mul(-0.7)));
-    material.colorNode = mix(color, warm, clamp(heat.add(coreFlash.mul(0.5)), 0, 1))
+    const tintColor = mix(vec3(1.22, 0.96, 0.78), vec3(0.8, 0.98, 1.25), tint.mul(0.5).add(0.5));
+    const tinted = color.mul(mix(vec3(1), tintColor, tint.abs().mul(0.45)));
+    material.colorNode = mix(tinted, warm, clamp(heat.add(coreFlash.mul(0.5)), 0, 1))
       .mul(level.mul(0.22).add(coreFlash.mul(0.55)).add(1))
       .mul(0.246 * Math.sqrt(k));
     material.opacityNode = glow(38);

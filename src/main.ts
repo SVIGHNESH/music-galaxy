@@ -2,8 +2,16 @@ import '@fontsource/syne/800.css';
 import '@fontsource/geist-mono/400.css';
 import './style.css';
 
-import { ACESFilmicToneMapping, PerspectiveCamera, RenderPipeline, Scene, WebGPURenderer } from 'three/webgpu';
-import { pass } from 'three/tsl';
+import {
+  ACESFilmicToneMapping,
+  PerspectiveCamera,
+  RenderPipeline,
+  Scene,
+  WebGPURenderer,
+  type TextureNode,
+} from 'three/webgpu';
+import { pass, uniform } from 'three/tsl';
+import { afterImage } from 'three/addons/tsl/display/AfterImageNode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { AudioAnalysis } from './audio/analysis';
@@ -13,6 +21,7 @@ import { pickStarCount, QualityGovernor } from './core/tier';
 import { createBlackHole } from './galaxy/blackHole';
 import { Galaxy } from './galaxy/Galaxy';
 import { Reactor, SILENT } from './galaxy/Reactor';
+import { SpectrumRing } from './galaxy/SpectrumRing';
 import { DebugMeter } from './ui/debugMeter';
 import { Hud } from './ui/hud';
 import { SourcePicker } from './ui/sourcePicker';
@@ -58,12 +67,27 @@ async function start() {
     hud.setInfo({ backend: isWebGPU ? 'WebGPU' : 'WebGL 2', stars: count });
   });
 
+  const ring = new SpectrumRing();
+  scene.add(ring);
+
+  // Post chain: trails -> lens -> bloom -> one fused pass for lens, horizon
+  // shadow, drop flash and colour split (full-screen passes are the main cost
+  // on integrated GPUs, so they are kept to a minimum).
+  const fx = { trail: uniform(0), aberration: uniform(0), whiteout: uniform(0) };
   const pipeline = new RenderPipeline(renderer);
   const scenePass = pass(scene, camera);
-  const hole = createBlackHole(scenePass.getTextureNode('output'));
+  const trails = afterImage(scenePass.getTextureNode('output'), fx.trail);
+  const hole = createBlackHole(trails.getTextureNode());
   const bloomPass = bloom(hole.lensed, 0.9, 0.55, 0.05);
-  pipeline.outputNode = hole.composite(hole.lensed.add(bloomPass));
-  const reactor = new Reactor(camera, FOV, bloomPass);
+  // @types/three still calls this getTexture(); the runtime method is getTextureNode().
+  const bloomTexture = (bloomPass as unknown as { getTextureNode(): TextureNode }).getTextureNode();
+  pipeline.outputNode = hole.finalize(bloomTexture, fx.aberration, fx.whiteout);
+  const reactor = new Reactor(camera, FOV, { bloom: bloomPass, ...fx }, ring);
+  if (new URLSearchParams(location.search).has('debug')) {
+    Object.assign(window, { galaxyDebug: { ring, reactor, fx, camera, renderer, scene, get galaxy() { return galaxy; } } });
+  }
+  controls.addEventListener('start', () => (reactor.interacting = true));
+  controls.addEventListener('end', () => (reactor.interacting = false));
 
   hud.setInfo({ backend: isWebGPU ? 'WebGPU' : 'WebGL 2', stars: galaxy.params.count });
 
@@ -121,6 +145,8 @@ async function start() {
     });
     hole.flare.value = reactor.flash;
     controls.update();
+    reactor.applyShake(clock.simTime);
+    ring.orient(camera);
     hole.update(camera, camera.fov);
     pipeline.render();
     hud.frame();

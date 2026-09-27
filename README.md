@@ -41,7 +41,12 @@ Beats are detected from low-frequency spectral flux against an adaptive threshol
 | Beats | A shockwave rolls through the arms, the core flashes warm, bloom surges, the camera punches in |
 | Mids | Rotation speeds up with momentum, and the arms swirl more |
 | Treble | About one star in five flares and flickers |
-| Level | Overall glow |
+| Level | Overall glow, and light trails in loud passages |
+| Spectrum | A ring of 128 bars around the black hole, lows at the top, highs at the bottom |
+| Drops | When the music slams back after a quieter stretch: a huge shockwave, white flash and camera shake |
+| Sound colour | Bassy, dark passages warm the galaxy; bright, airy ones cool it |
+
+Strong beats also split the colour channels for a moment.
 
 Silence settles everything back to the calm idle galaxy.
 With `prefers-reduced-motion`, the shockwave, swell and camera punch are scaled way down.

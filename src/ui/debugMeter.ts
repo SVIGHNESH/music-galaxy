@@ -14,6 +14,7 @@ export class DebugMeter {
   private lamp: HTMLElement;
   private beats: HTMLElement;
   private beatCount = 0;
+  private dropCount = 0;
   private lampUntil = 0;
 
   constructor(host: HTMLElement) {
@@ -44,6 +45,7 @@ export class DebugMeter {
 
   /** Called per fixed step so beat flags (true for one step) are never missed. */
   step(f: AudioFeatures, simTime: number) {
+    if (f.drop) this.dropCount++;
     if (f.beat) {
       this.beatCount++;
       this.lampUntil = simTime + 0.1;
@@ -51,6 +53,6 @@ export class DebugMeter {
     if (this.el.hidden) return;
     for (const { key } of ROWS) this.bars.get(key)!.style.transform = `scaleX(${f[key].toFixed(3)})`;
     this.lamp.classList.toggle('on', simTime < this.lampUntil);
-    this.beats.textContent = String(this.beatCount);
+    this.beats.textContent = this.dropCount ? `${this.beatCount} · ${this.dropCount} drop` : String(this.beatCount);
   }
 }

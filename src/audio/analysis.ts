@@ -10,7 +10,16 @@ export interface AudioFeatures {
   beatStrength: number;
   /** False while the input is silent or absent. */
   active: boolean;
+  /** Log-spaced spectrum, low to high, each 0..1. */
+  spectrum: Float32Array;
+  /** True on the step a drop lands: energy surging back after a quieter stretch. */
+  drop: boolean;
+  /** Sound colour relative to the song so far: -1 dark/bassy .. +1 bright/airy. */
+  tint: number;
 }
+
+export const SPECTRUM_BANDS = 64;
+const SPECTRUM_RANGE = [40, 14000] as const;
 
 const BANDS = {
   bass: [30, 160],
@@ -67,6 +76,23 @@ export class AudioAnalysis {
   private sinceBeat = Infinity;
   private readonly refractory = 0.22; // seconds; faster than any real tempo's beat spacing
 
+  // Spectrum: one shared gain keeps the shape of the spectrum honest; a
+  // gentle tilt lifts the highs so they aren't dwarfed by bass.
+  private readonly spectrumBins: [number, number][] = [];
+  private readonly spectrumTilt = new Float32Array(SPECTRUM_BANDS);
+  private readonly spectrumGain = new AutoGain(1e-3);
+  private readonly spectrumScratch = new Float32Array(SPECTRUM_BANDS);
+
+  // Drop detection compares a fast energy envelope with a slow one.
+  private energyFast = 0;
+  private energySlow = 0;
+  private sinceDrop = Infinity;
+  /** Seconds of continuous signal; the slow envelope is meaningless before it fills. */
+  private heard = 0;
+
+  private centroidMean = 0.5;
+  private centroidSeeded = false;
+
   readonly features: AudioFeatures = {
     bass: 0,
     mid: 0,
@@ -75,6 +101,9 @@ export class AudioAnalysis {
     beat: false,
     beatStrength: 0,
     active: false,
+    spectrum: new Float32Array(SPECTRUM_BANDS),
+    drop: false,
+    tint: 0,
   };
 
   constructor(fftSize: number, sampleRate: number) {
@@ -89,13 +118,24 @@ export class AudioAnalysis {
     ];
     this.ranges = { bass: toBins(BANDS.bass), mid: toBins(BANDS.mid), treble: toBins(BANDS.treble) };
     this.fluxEnd = Math.ceil(220 / hz);
+
+    const [lo, hi] = SPECTRUM_RANGE;
+    for (let b = 0; b < SPECTRUM_BANDS; b++) {
+      const f0 = lo * Math.pow(hi / lo, b / SPECTRUM_BANDS);
+      const f1 = lo * Math.pow(hi / lo, (b + 1) / SPECTRUM_BANDS);
+      const a = Math.max(1, Math.floor(f0 / hz));
+      this.spectrumBins.push([a, Math.max(a, Math.min(bins - 1, Math.floor(f1 / hz)))]);
+      this.spectrumTilt[b] = Math.pow((f0 + f1) / 2 / 1000, 0.35);
+    }
   }
 
   step(analyser: AnalyserNode | null, dt: number): AudioFeatures {
     const f = this.features;
     f.beat = false;
     f.beatStrength = 0;
+    f.drop = false;
     this.sinceBeat += dt;
+    this.sinceDrop += dt;
 
     if (!analyser) return this.decayToSilence();
 
@@ -148,16 +188,75 @@ export class AudioAnalysis {
     h.push(nFlux);
     if (h.length > this.historySize) h.shift();
 
+    this.stepSpectrum(f);
+    this.stepDrop(f, mean([1, this.ranges.treble[1]]), dt);
+    this.stepTint(f, dt);
     return f;
+  }
+
+  private stepSpectrum(f: AudioFeatures) {
+    let loudest = 0;
+    const bands = f.spectrum;
+    const next = this.spectrumScratch;
+    for (let b = 0; b < SPECTRUM_BANDS; b++) {
+      const [a, z] = this.spectrumBins[b];
+      let peak = 0;
+      for (let i = a; i <= z; i++) peak = Math.max(peak, this.amp[i]);
+      next[b] = peak * this.spectrumTilt[b];
+      loudest = Math.max(loudest, next[b]);
+    }
+    const gain = this.spectrumGain.apply(loudest) / Math.max(loudest, 1e-9);
+    for (let b = 0; b < SPECTRUM_BANDS; b++) {
+      bands[b] = follow(bands[b], Math.min(next[b] * gain, 1), 0.55, 0.14);
+    }
+  }
+
+  /**
+   * A drop is a beat that lands while short-term energy has jumped well above
+   * the recent average, i.e. the music has come back hard after a lull.
+   */
+  private stepDrop(f: AudioFeatures, energy: number, dt: number) {
+    this.heard += dt;
+    this.energyFast += (energy - this.energyFast) * (1 - Math.exp(-dt / 0.25));
+    this.energySlow += (energy - this.energySlow) * (1 - Math.exp(-dt / 4));
+    const surge = this.energyFast / Math.max(this.energySlow, 1e-6);
+    if (f.beat && this.heard > 4 && surge > 1.5 && this.sinceDrop > 8) {
+      f.drop = true;
+      this.sinceDrop = 0;
+    }
+  }
+
+  /** Spectral centroid on a log scale, compared with the song's own running mean. */
+  private stepTint(f: AudioFeatures, dt: number) {
+    let weighted = 0;
+    let total = 0;
+    for (let b = 0; b < SPECTRUM_BANDS; b++) {
+      weighted += b * f.spectrum[b];
+      total += f.spectrum[b];
+    }
+    if (total < 1e-4) return;
+    const centroid = weighted / total / (SPECTRUM_BANDS - 1);
+    if (!this.centroidSeeded) {
+      this.centroidMean = centroid;
+      this.centroidSeeded = true;
+    }
+    this.centroidMean += (centroid - this.centroidMean) * (1 - Math.exp(-dt / 10));
+    const target = Math.max(-1, Math.min(1, (centroid - this.centroidMean) * 6));
+    f.tint += (target - f.tint) * (1 - Math.exp(-dt / 0.8));
   }
 
   private decayToSilence() {
     const f = this.features;
     f.active = false;
+    this.heard = 0;
+    this.energyFast = 0;
+    this.energySlow = 0;
     f.bass = follow(f.bass, 0, 0, 0.08);
     f.mid = follow(f.mid, 0, 0, 0.08);
     f.treble = follow(f.treble, 0, 0, 0.08);
     f.level = follow(f.level, 0, 0, 0.06);
+    for (let b = 0; b < SPECTRUM_BANDS; b++) f.spectrum[b] = follow(f.spectrum[b], 0, 0, 0.1);
+    f.tint = follow(f.tint, 0, 0, 0.02);
     return f;
   }
 }

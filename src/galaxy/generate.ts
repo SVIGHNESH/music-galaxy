@@ -58,6 +58,9 @@ export function generateGalaxy(p: GalaxyParams): GalaxyData {
       y = r * Math.cos(phi) * 0.55;
       z = r * Math.sin(phi) * Math.sin(theta);
       c.copy(palette.core).lerp(palette.inner, Math.min(r / (p.radius * 0.18), 1) * rng.next());
+      // Dimmer than the arms: the bulge is so dense it would otherwise blow out
+      // to flat white and swallow the black hole's silhouette.
+      c.multiplyScalar(0.55);
       sizes[i] = rng.range(0.6, 1.4);
     } else if (kind < p.bulge + p.halo) {
       // Sparse spherical halo that gives the disc depth from oblique angles.
