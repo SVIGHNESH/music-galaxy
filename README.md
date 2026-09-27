@@ -5,6 +5,8 @@ Runs in any modern browser, on desktop and mobile, with the same look everywhere
 
 Created by Vighnesh Shukla.
 
+Live: https://music-galaxy-rho.vercel.app
+
 ## Requirements
 
 - Node 20.19+ or 22.12+ (Vite 8)
@@ -62,7 +64,7 @@ The service worker is generated at build time with the exact files of that build
 URL flags:
 
 - `?renderer=webgl` forces the WebGL 2 fallback on a WebGPU-capable browser.
-- `?stars=N` fixes the star count and turns off adaptive quality.
+- `?stars=N` fixes the star count at full resolution and turns off adaptive quality.
 
 - `?debug` opens the analysis meter and keeps the stats visible on phones.
 
@@ -72,7 +74,7 @@ Click or tap the galaxy to send a test shockwave through the disc.
 
 - The galaxy is generated from a fixed seed.
 - The simulation runs in fixed 60Hz steps on the GPU, independent of display refresh rate.
-- Star count adapts to the device: the app measures real frame rate at startup and steps down until it holds ~55fps, then remembers the result.
+- Quality adapts to the device: the app measures real frame rate at startup and steps down a ladder of star count and render resolution until it holds ~55fps, then remembers the level.
 Per-star light scales with the budget so total brightness stays constant.
 - The camera distance fits the screen aspect, so phones see the whole disc.
 
@@ -90,4 +92,4 @@ pnpm preview
 3. Audio input and analysis: file, microphone or monitor device, tab audio (done)
 4. Audio to visual mapping (done)
 5. Polish: palettes, UI, PWA (done)
-6. Deploy
+6. Deploy to Vercel (done): https://music-galaxy-rho.vercel.app

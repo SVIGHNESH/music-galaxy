@@ -17,7 +17,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { AudioAnalysis } from './audio/analysis';
 import { AudioEngine } from './audio/AudioEngine';
 import { FixedClock } from './core/clock';
-import { pickStarCount, QualityGovernor } from './core/tier';
+import { pickQuality, QualityGovernor } from './core/tier';
 import { finalPass } from './galaxy/finalPass';
 import { Galaxy } from './galaxy/Galaxy';
 import { Palette } from './galaxy/palette';
@@ -35,7 +35,6 @@ async function start() {
   // ?renderer=webgl forces the fallback path so it can be checked on WebGPU machines.
   const forceWebGL = new URLSearchParams(location.search).get('renderer') === 'webgl';
   const renderer = new WebGPURenderer({ canvas, antialias: false, forceWebGL });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(innerWidth, innerHeight);
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.1;
@@ -57,17 +56,23 @@ async function start() {
 
   const isWebGPU = (renderer.backend as { isWebGPUBackend?: boolean }).isWebGPUBackend === true;
   const palette = new Palette();
-  let galaxy = new Galaxy(palette, { count: pickStarCount(isWebGPU) });
+  const quality = pickQuality(isWebGPU);
+  const baseDpr = Math.min(devicePixelRatio, 2);
+  renderer.setPixelRatio(baseDpr * quality.scale);
+  let galaxy = new Galaxy(palette, { count: quality.stars });
   scene.add(galaxy);
 
-  // Rebuild at a smaller budget if this device can't hold the frame rate.
-  // Same seed and light compensation, so the galaxy looks the same, just sparser.
-  const governor = new QualityGovernor(isWebGPU, galaxy.params.count, (count) => {
-    scene.remove(galaxy);
-    galaxy.dispose();
-    galaxy = new Galaxy(palette, { count });
-    scene.add(galaxy);
-    hud.setInfo({ backend: isWebGPU ? 'WebGPU' : 'WebGL 2', stars: count });
+  // Step down if this device can't hold the frame rate. Same seed and light
+  // compensation, so the galaxy looks the same, just sparser and softer.
+  const governor = new QualityGovernor(isWebGPU, quality, ({ stars, scale }) => {
+    renderer.setPixelRatio(baseDpr * scale);
+    if (stars !== galaxy.params.count) {
+      scene.remove(galaxy);
+      galaxy.dispose();
+      galaxy = new Galaxy(palette, { count: stars });
+      scene.add(galaxy);
+    }
+    hud.setInfo({ backend: isWebGPU ? 'WebGPU' : 'WebGL 2', stars });
   });
 
   const ring = new SpectrumRing(palette);
