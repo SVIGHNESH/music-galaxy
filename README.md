@@ -33,6 +33,19 @@ Press `D` to show the analysis meter (bass, mid, treble, level, beats).
 Each band has automatic gain, so a quiet microphone and a loud file drive the visuals equally.
 Beats are detected from low-frequency spectral flux against an adaptive threshold.
 
+## How the music moves the galaxy
+
+| Sound | Galaxy |
+| --- | --- |
+| Bass | The core breathes: the inner disc swells outward and thickens |
+| Beats | A shockwave rolls through the arms, the core flashes warm, bloom surges, the camera punches in |
+| Mids | Rotation speeds up with momentum, and the arms swirl more |
+| Treble | About one star in five flares and flickers |
+| Level | Overall glow |
+
+Silence settles everything back to the calm idle galaxy.
+With `prefers-reduced-motion`, the shockwave, swell and camera punch are scaled way down.
+
 ## Testing flags
 
 URL flags:
@@ -64,6 +77,6 @@ pnpm preview
 1. Static galaxy with bloom and orbit camera (done)
 2. GPU compute simulation with adaptive star budget (done)
 3. Audio input and analysis: file, microphone or monitor device, tab audio (done)
-4. Audio to visual mapping
+4. Audio to visual mapping (done)
 5. Polish: black hole, palettes, UI, PWA
 6. Deploy

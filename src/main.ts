@@ -11,6 +11,7 @@ import { AudioEngine } from './audio/AudioEngine';
 import { FixedClock } from './core/clock';
 import { pickStarCount, QualityGovernor } from './core/tier';
 import { Galaxy } from './galaxy/Galaxy';
+import { Reactor, SILENT } from './galaxy/Reactor';
 import { DebugMeter } from './ui/debugMeter';
 import { Hud } from './ui/hud';
 import { SourcePicker } from './ui/sourcePicker';
@@ -30,7 +31,8 @@ async function start() {
   await renderer.init();
 
   const scene = new Scene();
-  const camera = new PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 400);
+  const FOV = 50;
+  const camera = new PerspectiveCamera(FOV, innerWidth / innerHeight, 0.05, 400);
   camera.position.set(0, 4.2, 10.5);
 
   const controls = new OrbitControls(camera, canvas);
@@ -58,7 +60,9 @@ async function start() {
   const pipeline = new RenderPipeline(renderer);
   const scenePass = pass(scene, camera);
   const color = scenePass.getTextureNode('output');
-  pipeline.outputNode = color.add(bloom(color, 0.9, 0.55, 0.05));
+  const bloomPass = bloom(color, 0.9, 0.55, 0.05);
+  pipeline.outputNode = color.add(bloomPass);
+  const reactor = new Reactor(camera, FOV, bloomPass);
 
   hud.setInfo({ backend: isWebGPU ? 'WebGPU' : 'WebGL 2', stars: galaxy.params.count });
 
@@ -67,7 +71,7 @@ async function start() {
   const fitCamera = () => {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
-    const halfV = Math.tan((camera.fov * Math.PI) / 360);
+    const halfV = Math.tan((FOV * Math.PI) / 360);
     const fitWidth = (galaxy.params.radius * 1.05) / (halfV * camera.aspect);
     const distance = Math.max(11.3, fitWidth);
     camera.position.setLength(distance);
@@ -109,12 +113,9 @@ async function start() {
   const clock = new FixedClock();
   renderer.setAnimationLoop(() => {
     clock.tick((t) => {
-      if (analysis) {
-        const f = analysis.step(audio.analyser, clock.step);
-        meter.step(f, t);
-        // Placeholder mapping to prove the chain end to end; milestone 4 replaces it.
-        if (f.beat) galaxy.pulse(8 + 16 * f.beatStrength);
-      }
+      const f = analysis ? analysis.step(audio.analyser, clock.step) : SILENT;
+      meter.step(f, t);
+      reactor.step(f, galaxy, clock.step);
       galaxy.simulate(renderer, t, clock.step);
     });
     controls.update();
